@@ -14,6 +14,15 @@ import {
 import { ADMIN_EMAIL, PHOTO_BUCKET, supabase } from "./lib/supabase";
 import type { GalleryPhoto, PeopleMap, Person, SupabasePersonRow } from "./types";
 
+type UserRole = "admin" | "editor" | "viewer" | null;
+
+type UserRoleRow = {
+  user_id: string;
+  email: string | null;
+  role: "admin" | "editor" | "viewer";
+  approved: boolean;
+};
+
 function extractSortableYear(value: string): number {
   const text = (value || "").trim();
   if (!text || text === "—") return Number.POSITIVE_INFINITY;
@@ -59,6 +68,10 @@ export default function App() {
   const [authError, setAuthError] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
 
+  const [userRole, setUserRole] = useState<UserRole>(null);
+  const [isApproved, setIsApproved] = useState(false);
+  const [isLoadingRole, setIsLoadingRole] = useState(false);
+
   const [saveMessage, setSaveMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -75,7 +88,7 @@ export default function App() {
   const galleryPhotoInputRef = useRef<HTMLInputElement | null>(null);
   const focusDropdownRef = useRef<HTMLDivElement | null>(null);
 
-  const editingEnabled = Boolean(session);
+  const editingEnabled = userRole === "admin" || userRole === "editor";
 
   useEffect(() => {
     let mounted = true;
@@ -95,6 +108,54 @@ export default function App() {
       data.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadUserRole() {
+      if (!session?.user) {
+        setUserRole(null);
+        setIsApproved(false);
+        setIsLoadingRole(false);
+        return;
+      }
+
+      setIsLoadingRole(true);
+
+      try {
+        const { data, error } = await supabase
+          .from("user_roles")
+          .select("user_id, email, role, approved")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+        if (!active) return;
+
+        const row = data as UserRoleRow | null;
+
+        if (!row) {
+          setUserRole(null);
+          setIsApproved(false);
+        } else {
+          setUserRole(row.role);
+          setIsApproved(Boolean(row.approved));
+        }
+      } catch {
+        if (!active) return;
+        setUserRole(null);
+        setIsApproved(false);
+      } finally {
+        if (active) setIsLoadingRole(false);
+      }
+    }
+
+    loadUserRole();
+
+    return () => {
+      active = false;
+    };
+  }, [session]);
 
   useEffect(() => {
     let mounted = true;
@@ -255,6 +316,8 @@ export default function App() {
     setDraftPerson(null);
     setIsCreatingPerson(false);
     setPage("tree");
+    setUserRole(null);
+    setIsApproved(false);
   }
 
   function startCreatingPerson() {
@@ -313,8 +376,8 @@ export default function App() {
     const file = event.target.files?.[0];
     if (!file || !selected) return;
 
-    if (!session) {
-      setSaveMessage("Tens de iniciar sessão para enviar fotos.");
+    if (!session || !editingEnabled) {
+      setSaveMessage("Tens de iniciar sessão com permissões de edição para enviar fotos.");
       event.target.value = "";
       return;
     }
@@ -354,8 +417,8 @@ export default function App() {
     const file = event.target.files?.[0];
     if (!file || !selected) return;
 
-    if (!session) {
-      setSaveMessage("Tens de iniciar sessão para enviar fotos.");
+    if (!session || !editingEnabled) {
+      setSaveMessage("Tens de iniciar sessão com permissões de edição para enviar fotos.");
       event.target.value = "";
       return;
     }
@@ -421,8 +484,8 @@ export default function App() {
   }
 
   async function savePersonToSupabase(person: Person) {
-    if (!session) {
-      setSaveMessage("Tens de iniciar sessão para guardar alterações.");
+    if (!session || !editingEnabled) {
+      setSaveMessage("Tens de iniciar sessão com permissões de edição para guardar alterações.");
       return;
     }
 
@@ -591,7 +654,7 @@ export default function App() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || isLoadingRole) {
     return (
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: 32 }}>
         <div
@@ -603,6 +666,58 @@ export default function App() {
           }}
         >
           A carregar dados…
+        </div>
+      </div>
+    );
+  }
+
+  if (session && !isApproved) {
+    return (
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: 32 }}>
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e7e5e4",
+            borderRadius: 24,
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              textTransform: "uppercase",
+              letterSpacing: "0.18em",
+              color: "#92400e",
+              marginBottom: 10,
+            }}
+          >
+            Acesso pendente
+          </div>
+
+          <h2 style={{ marginTop: 0 }}>A aguardar aprovação</h2>
+
+          <p style={{ color: "#57534e" }}>
+            O teu acesso ainda não foi aprovado pelo administrador.
+          </p>
+
+          {session.user.email ? (
+            <p style={{ color: "#57534e", marginBottom: 20 }}>
+              Conta atual: {session.user.email}
+            </p>
+          ) : null}
+
+          <button
+            onClick={handleLogout}
+            style={{
+              border: "1px solid #d6d3d1",
+              background: "white",
+              borderRadius: 14,
+              padding: "10px 14px",
+              cursor: "pointer",
+            }}
+          >
+            Terminar sessão
+          </button>
         </div>
       </div>
     );
@@ -831,18 +946,20 @@ export default function App() {
 
           {session ? (
             <>
-              <button
-                onClick={startCreatingPerson}
-                style={{
-                  border: "1px solid #d6d3d1",
-                  background: "white",
-                  borderRadius: 14,
-                  padding: "10px 14px",
-                  cursor: "pointer",
-                }}
-              >
-                Nova pessoa
-              </button>
+              {editingEnabled ? (
+                <button
+                  onClick={startCreatingPerson}
+                  style={{
+                    border: "1px solid #d6d3d1",
+                    background: "white",
+                    borderRadius: 14,
+                    padding: "10px 14px",
+                    cursor: "pointer",
+                  }}
+                >
+                  Nova pessoa
+                </button>
+              ) : null}
 
               <button
                 onClick={handleLogout}
@@ -879,7 +996,8 @@ export default function App() {
 
         {session?.user?.email ? (
           <p style={{ color: "#166534", marginTop: 12, marginBottom: 0 }}>
-            Sessão ativa: {session.user.email}
+            Sessão ativa: {session.user.email}{" "}
+            {userRole ? `(${userRole})` : ""}
           </p>
         ) : null}
       </div>
@@ -895,11 +1013,11 @@ export default function App() {
           activeSpouseId={activeSpouseId}
           activeSpouseIndex={clampedSpouseIndex}
           totalSpouses={totalSpouses}
-          onSelect={(id) => {
+          onSelect={(id: string) => {
             setFocusId(id);
             setSelectedId(id);
           }}
-          onOpenDetails={(id) => {
+          onOpenDetails={(id: string) => {
             setSelectedId(id);
             setSaveMessage("");
             setGalleryNoteDraft("");
@@ -943,7 +1061,7 @@ export default function App() {
             Acesso privado
           </div>
 
-          <h2 style={{ marginTop: 0 }}>Entrar para editar a árvore</h2>
+          <h2 style={{ marginTop: 0 }}>Entrar</h2>
 
           <div style={{ display: "grid", gap: 14 }}>
             <input
@@ -1028,7 +1146,7 @@ export default function App() {
             setIsCreatingPerson(false);
             setPage("tree");
           }}
-          onChange={(nextPerson) => {
+          onChange={(nextPerson: Person) => {
             if (isCreatingPerson || draftPerson) {
               setDraftPerson(nextPerson);
             } else {
