@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import TreeView from "./components/TreeView";
 import PersonDetailView from "./components/PersonDetailView";
 import GlobalFamilyTreeManualView from "./components/GlobalFamilyTreeManualView";
+import AdminAccessPanel from "./components/AdminAccessPanel";
 import { FALLBACK_PEOPLE } from "./data/fallbackPeople";
 import {
   createEmptyPerson,
@@ -56,7 +57,9 @@ export default function App() {
   const [people, setPeople] = useState<PeopleMap>(FALLBACK_PEOPLE);
   const [focusId, setFocusId] = useState("jose");
   const [selectedId, setSelectedId] = useState("jose");
-  const [page, setPage] = useState<"tree" | "person" | "auth" | "globalTreeManual">("tree");
+  const [page, setPage] = useState<
+    "tree" | "person" | "auth" | "globalTreeManual" | "admin"
+  >("tree");
 
   const [draftPerson, setDraftPerson] = useState<Person | null>(null);
   const [isCreatingPerson, setIsCreatingPerson] = useState(false);
@@ -89,6 +92,7 @@ export default function App() {
   const focusDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const editingEnabled = userRole === "admin" || userRole === "editor";
+  const isAdmin = userRole === "admin";
 
   useEffect(() => {
     let mounted = true;
@@ -132,15 +136,26 @@ export default function App() {
         if (error) throw error;
         if (!active) return;
 
-        const row = data as UserRoleRow | null;
+        let row = data as UserRoleRow | null;
 
         if (!row) {
-          setUserRole(null);
-          setIsApproved(false);
-        } else {
-          setUserRole(row.role);
-          setIsApproved(Boolean(row.approved));
+          const { data: insertedData, error: insertError } = await supabase
+            .from("user_roles")
+            .insert({
+              user_id: session.user.id,
+              email: session.user.email || "",
+              role: "viewer",
+              approved: false,
+            })
+            .select("user_id, email, role, approved")
+            .single();
+
+          if (insertError) throw insertError;
+          row = insertedData as UserRoleRow;
         }
+
+        setUserRole(row.role);
+        setIsApproved(Boolean(row.approved));
       } catch {
         if (!active) return;
         setUserRole(null);
@@ -671,6 +686,87 @@ export default function App() {
     );
   }
 
+  if (!session) {
+    return (
+      <div style={{ maxWidth: 900, margin: "0 auto", padding: 32 }}>
+        <div
+          style={{
+            background: "white",
+            border: "1px solid #e7e5e4",
+            borderRadius: 24,
+            padding: 24,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 12,
+              textTransform: "uppercase",
+              letterSpacing: "0.18em",
+              color: "#92400e",
+              marginBottom: 10,
+            }}
+          >
+            Acesso privado
+          </div>
+
+          <h2 style={{ marginTop: 0 }}>Entrar</h2>
+
+          <p style={{ color: "#57534e" }}>
+            Esta árvore está privada. Tens de iniciar sessão para aceder.
+          </p>
+
+          <div style={{ display: "grid", gap: 14, marginTop: 18 }}>
+            <input
+              value={authEmail}
+              onChange={(e) => setAuthEmail(e.target.value)}
+              placeholder="seu-email@exemplo.com"
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 14,
+                border: "1px solid #d6d3d1",
+              }}
+            />
+
+            <input
+              type="password"
+              value={authPassword}
+              onChange={(e) => setAuthPassword(e.target.value)}
+              placeholder="********"
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 14,
+                border: "1px solid #d6d3d1",
+              }}
+            />
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <button
+                onClick={handleAuthSubmit}
+                disabled={isAuthLoading || !authEmail || !authPassword}
+                style={{
+                  border: "1px solid #292524",
+                  background: "#292524",
+                  color: "white",
+                  borderRadius: 14,
+                  padding: "10px 14px",
+                  cursor: "pointer",
+                  opacity: isAuthLoading ? 0.7 : 1,
+                }}
+              >
+                {isAuthLoading ? "A autenticar..." : "Entrar"}
+              </button>
+            </div>
+
+            {authStatus ? <p style={{ color: "#166534", margin: 0 }}>{authStatus}</p> : null}
+            {authError ? <p style={{ color: "#b91c1c", margin: 0 }}>{authError}</p> : null}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (session && !isApproved) {
     return (
       <div style={{ maxWidth: 900, margin: "0 auto", padding: 32 }}>
@@ -923,7 +1019,22 @@ export default function App() {
             </button>
           ) : null}
 
-          {page === "person" || page === "globalTreeManual" ? (
+          {isAdmin ? (
+            <button
+              onClick={() => setPage("admin")}
+              style={{
+                border: "1px solid #d6d3d1",
+                background: "white",
+                borderRadius: 14,
+                padding: "10px 14px",
+                cursor: "pointer",
+              }}
+            >
+              Gestão de acessos
+            </button>
+          ) : null}
+
+          {page === "person" || page === "globalTreeManual" || page === "admin" ? (
             <button
               onClick={() => {
                 setSaveMessage("");
@@ -944,43 +1055,9 @@ export default function App() {
             </button>
           ) : null}
 
-          {session ? (
-            <>
-              {editingEnabled ? (
-                <button
-                  onClick={startCreatingPerson}
-                  style={{
-                    border: "1px solid #d6d3d1",
-                    background: "white",
-                    borderRadius: 14,
-                    padding: "10px 14px",
-                    cursor: "pointer",
-                  }}
-                >
-                  Nova pessoa
-                </button>
-              ) : null}
-
-              <button
-                onClick={handleLogout}
-                style={{
-                  border: "1px solid #d6d3d1",
-                  background: "white",
-                  borderRadius: 14,
-                  padding: "10px 14px",
-                  cursor: "pointer",
-                }}
-              >
-                Terminar sessão
-              </button>
-            </>
-          ) : (
+          {editingEnabled ? (
             <button
-              onClick={() => {
-                setAuthError("");
-                setAuthStatus("");
-                setPage("auth");
-              }}
+              onClick={startCreatingPerson}
               style={{
                 border: "1px solid #d6d3d1",
                 background: "white",
@@ -989,15 +1066,27 @@ export default function App() {
                 cursor: "pointer",
               }}
             >
-              Entrar para editar
+              Nova pessoa
             </button>
-          )}
+          ) : null}
+
+          <button
+            onClick={handleLogout}
+            style={{
+              border: "1px solid #d6d3d1",
+              background: "white",
+              borderRadius: 14,
+              padding: "10px 14px",
+              cursor: "pointer",
+            }}
+          >
+            Terminar sessão
+          </button>
         </div>
 
         {session?.user?.email ? (
           <p style={{ color: "#166534", marginTop: 12, marginBottom: 0 }}>
-            Sessão ativa: {session.user.email}{" "}
-            {userRole ? `(${userRole})` : ""}
+            Sessão ativa: {session.user.email} {userRole ? `(${userRole})` : ""}
           </p>
         ) : null}
       </div>
@@ -1038,92 +1127,6 @@ export default function App() {
             );
           }}
         />
-      ) : page === "auth" ? (
-        <div
-          style={{
-            background: "white",
-            border: "1px solid #e7e5e4",
-            borderRadius: 24,
-            padding: 24,
-            maxWidth: 700,
-            margin: "0 auto",
-          }}
-        >
-          <div
-            style={{
-              fontSize: 12,
-              textTransform: "uppercase",
-              letterSpacing: "0.18em",
-              color: "#92400e",
-              marginBottom: 10,
-            }}
-          >
-            Acesso privado
-          </div>
-
-          <h2 style={{ marginTop: 0 }}>Entrar</h2>
-
-          <div style={{ display: "grid", gap: 14 }}>
-            <input
-              value={authEmail}
-              onChange={(e) => setAuthEmail(e.target.value)}
-              placeholder="seu-email@exemplo.com"
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                borderRadius: 14,
-                border: "1px solid #d6d3d1",
-              }}
-            />
-
-            <input
-              type="password"
-              value={authPassword}
-              onChange={(e) => setAuthPassword(e.target.value)}
-              placeholder="********"
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                borderRadius: 14,
-                border: "1px solid #d6d3d1",
-              }}
-            />
-
-            <div style={{ display: "flex", gap: 12 }}>
-              <button
-                onClick={handleAuthSubmit}
-                disabled={isAuthLoading || !authEmail || !authPassword}
-                style={{
-                  border: "1px solid #292524",
-                  background: "#292524",
-                  color: "white",
-                  borderRadius: 14,
-                  padding: "10px 14px",
-                  cursor: "pointer",
-                  opacity: isAuthLoading ? 0.7 : 1,
-                }}
-              >
-                {isAuthLoading ? "A autenticar..." : "Entrar"}
-              </button>
-
-              <button
-                onClick={() => setPage("tree")}
-                style={{
-                  border: "1px solid #d6d3d1",
-                  background: "white",
-                  borderRadius: 14,
-                  padding: "10px 14px",
-                  cursor: "pointer",
-                }}
-              >
-                Voltar
-              </button>
-            </div>
-
-            {authStatus ? <p style={{ color: "#166534", margin: 0 }}>{authStatus}</p> : null}
-            {authError ? <p style={{ color: "#b91c1c", margin: 0 }}>{authError}</p> : null}
-          </div>
-        </div>
       ) : page === "globalTreeManual" ? (
         <GlobalFamilyTreeManualView
           people={people}
@@ -1131,6 +1134,8 @@ export default function App() {
           onBack={() => setPage("tree")}
           onOpenPerson={openPersonDetail}
         />
+      ) : page === "admin" ? (
+        <AdminAccessPanel currentUserId={session.user.id} />
       ) : (
         <PersonDetailView
           person={selected}
