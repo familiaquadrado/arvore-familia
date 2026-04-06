@@ -153,11 +153,12 @@ export default function App() {
           if (insertError) throw insertError;
           row = insertedData as UserRoleRow;
         }
-
+        console.log("user_roles row:", row);    
         setUserRole(row.role);
         setIsApproved(Boolean(row.approved));
-      } catch {
+      } catch (error: any) {
         if (!active) return;
+        console.error("Erro a carregar user_roles:", error);
         setUserRole(null);
         setIsApproved(false);
       } finally {
