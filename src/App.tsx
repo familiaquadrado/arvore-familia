@@ -3,7 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import TreeView from "./components/TreeView";
 import PersonDetailView from "./components/PersonDetailView";
 import GlobalFamilyTreeManualView from "./components/GlobalFamilyTreeManualView";
-import AdminAccessPanel from "./components/AdminAccessPanel";
+import AdminAccessPanel from "./components/AdminAccessPanel.tsx";
 import { FALLBACK_PEOPLE } from "./data/fallbackPeople";
 import {
   createEmptyPerson,
@@ -156,11 +156,13 @@ export default function App() {
 
         setUserRole(row.role);
         setIsApproved(Boolean(row.approved));
-      } catch {
-        if (!active) return;
-        setUserRole(null);
-        setIsApproved(false);
-      } finally {
+            } catch (error: any) {
+              if (!active) return;
+              console.error("Erro a carregar user_roles:", error);
+              setAuthError(error?.message || "Erro a carregar permissões.");
+              setUserRole(null);
+              setIsApproved(false);
+            } finally {
         if (active) setIsLoadingRole(false);
       }
     }
