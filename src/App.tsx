@@ -4,6 +4,7 @@ import TreeView from "./components/TreeView";
 import PersonDetailView from "./components/PersonDetailView";
 import GlobalFamilyTreeManualView from "./components/GlobalFamilyTreeManualView";
 import AdminAccessPanel from "./components/AdminAccessPanel";
+import BirthdayCalendarView from "./components/BirthdayCalendarView";
 import { FALLBACK_PEOPLE } from "./data/fallbackPeople";
 import {
   createEmptyPerson,
@@ -58,7 +59,7 @@ export default function App() {
   const [focusId, setFocusId] = useState("jose");
   const [selectedId, setSelectedId] = useState("jose");
   const [page, setPage] = useState<
-    "tree" | "person" | "auth" | "globalTreeManual" | "admin"
+    "tree" | "person" | "auth" | "globalTreeManual" | "admin" | "birthdays"
   >("tree");
 
   const [draftPerson, setDraftPerson] = useState<Person | null>(null);
@@ -987,6 +988,19 @@ export default function App() {
             </button>
           ) : null}
 
+          <button
+            onClick={() => setPage("birthdays")}
+            style={{
+              border: "1px solid #d6d3d1",
+              background: "white",
+              borderRadius: 14,
+              padding: "10px 14px",
+              cursor: "pointer",
+            }}
+          >
+            Calendário de aniversários
+          </button>
+
           {isAdmin ? (
             <button
               onClick={() => setPage("admin")}
@@ -1002,7 +1016,10 @@ export default function App() {
             </button>
           ) : null}
 
-          {page === "person" || page === "globalTreeManual" || page === "admin" ? (
+          {page === "person" ||
+          page === "globalTreeManual" ||
+          page === "admin" ||
+          page === "birthdays" ? (
             <button
               onClick={() => {
                 setSaveMessage("");
@@ -1104,6 +1121,12 @@ export default function App() {
         />
       ) : page === "admin" ? (
         <AdminAccessPanel currentUserId={session.user.id} />
+      ) : page === "birthdays" ? (
+        <BirthdayCalendarView
+          people={people}
+          onBack={() => setPage("tree")}
+          onOpenPerson={openPersonDetail}
+        />
       ) : (
         <PersonDetailView
           person={selected}
