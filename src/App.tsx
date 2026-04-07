@@ -12,7 +12,7 @@ import {
   normalizePerson,
   slugifyId,
 } from "./lib/helpers";
-import { ADMIN_EMAIL, PHOTO_BUCKET, supabase } from "./lib/supabase";
+import { PHOTO_BUCKET, supabase } from "./lib/supabase";
 import type { GalleryPhoto, PeopleMap, Person, SupabasePersonRow } from "./types";
 
 type UserRole = "admin" | "editor" | "viewer" | null;
@@ -65,9 +65,6 @@ export default function App() {
   const [isCreatingPerson, setIsCreatingPerson] = useState(false);
 
   const [session, setSession] = useState<Session | null>(null);
-  const [authEmail, setAuthEmail] = useState(ADMIN_EMAIL);
-  const [authPassword, setAuthPassword] = useState("");
-  const [authMode, setAuthMode] = useState<"sign_in" | "sign_up">("sign_in");
   const [authStatus, setAuthStatus] = useState("");
   const [authError, setAuthError] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
@@ -297,38 +294,22 @@ export default function App() {
     );
   }, [sortedPeopleForFocus, focusQuery]);
 
-  async function handleAuthSubmit() {
+  async function handleGoogleLogin() {
     setIsAuthLoading(true);
     setAuthError("");
     setAuthStatus("");
 
     try {
-      if (authMode === "sign_in") {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: authEmail,
-          password: authPassword,
-        });
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: window.location.origin,
+        },
+      });
 
-        if (error) throw error;
-
-        setAuthStatus("Login efetuado com sucesso.");
-        setPage("tree");
-      } else {
-        const { error } = await supabase.auth.signUp({
-          email: authEmail,
-          password: authPassword,
-        });
-
-        if (error) throw error;
-
-        setAuthStatus(
-          "Pedido de acesso enviado. Depois de entrares, a tua conta ficará a aguardar aprovação do administrador.",
-        );
-        setAuthMode("sign_in");
-      }
+      if (error) throw error;
     } catch (error: any) {
-      setAuthError(error?.message || "Não foi possível autenticar.");
-    } finally {
+      setAuthError(error?.message || "Não foi possível entrar com Google.");
       setIsAuthLoading(false);
     }
   }
@@ -724,103 +705,27 @@ export default function App() {
             Acesso privado
           </div>
 
-          <h2 style={{ marginTop: 0 }}>
-            {authMode === "sign_in" ? "Entrar" : "Pedir acesso"}
-          </h2>
+          <h2 style={{ marginTop: 0 }}>Entrar com Google</h2>
 
           <p style={{ color: "#57534e" }}>
-            {authMode === "sign_in"
-              ? "Esta árvore está privada. Tens de iniciar sessão para aceder."
-              : "Cria a tua conta para pedir acesso. Depois o administrador aprova e define se podes só ver ou também editar."}
+            Esta árvore está privada. Entra com a tua conta Google para pedir acesso.
           </p>
 
-          <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <div style={{ display: "grid", gap: 14, marginTop: 20 }}>
             <button
-              onClick={() => {
-                setAuthMode("sign_in");
-                setAuthError("");
-                setAuthStatus("");
-              }}
+              onClick={handleGoogleLogin}
+              disabled={isAuthLoading}
               style={{
                 border: "1px solid #d6d3d1",
-                background: authMode === "sign_in" ? "#292524" : "white",
-                color: authMode === "sign_in" ? "white" : "#292524",
+                background: "white",
                 borderRadius: 14,
-                padding: "10px 14px",
+                padding: "12px 16px",
                 cursor: "pointer",
+                fontSize: 15,
               }}
             >
-              Entrar
+              {isAuthLoading ? "A redirecionar..." : "Continuar com Google"}
             </button>
-
-            <button
-              onClick={() => {
-                setAuthMode("sign_up");
-                setAuthError("");
-                setAuthStatus("");
-              }}
-              style={{
-                border: "1px solid #d6d3d1",
-                background: authMode === "sign_up" ? "#292524" : "white",
-                color: authMode === "sign_up" ? "white" : "#292524",
-                borderRadius: 14,
-                padding: "10px 14px",
-                cursor: "pointer",
-              }}
-            >
-              Pedir acesso
-            </button>
-          </div>
-
-          <div style={{ display: "grid", gap: 14 }}>
-            <input
-              value={authEmail}
-              onChange={(e) => setAuthEmail(e.target.value)}
-              placeholder="seu-email@exemplo.com"
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                borderRadius: 14,
-                border: "1px solid #d6d3d1",
-              }}
-            />
-
-            <input
-              type="password"
-              value={authPassword}
-              onChange={(e) => setAuthPassword(e.target.value)}
-              placeholder="********"
-              style={{
-                width: "100%",
-                padding: "12px 14px",
-                borderRadius: 14,
-                border: "1px solid #d6d3d1",
-              }}
-            />
-
-            <div style={{ display: "flex", gap: 12 }}>
-              <button
-                onClick={handleAuthSubmit}
-                disabled={isAuthLoading || !authEmail || !authPassword}
-                style={{
-                  border: "1px solid #292524",
-                  background: "#292524",
-                  color: "white",
-                  borderRadius: 14,
-                  padding: "10px 14px",
-                  cursor: "pointer",
-                  opacity: isAuthLoading ? 0.7 : 1,
-                }}
-              >
-                {isAuthLoading
-                  ? authMode === "sign_in"
-                    ? "A autenticar..."
-                    : "A criar pedido..."
-                  : authMode === "sign_in"
-                    ? "Entrar"
-                    : "Pedir acesso"}
-              </button>
-            </div>
 
             {authStatus ? <p style={{ color: "#166534", margin: 0 }}>{authStatus}</p> : null}
             {authError ? <p style={{ color: "#b91c1c", margin: 0 }}>{authError}</p> : null}
