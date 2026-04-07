@@ -67,6 +67,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authEmail, setAuthEmail] = useState(ADMIN_EMAIL);
   const [authPassword, setAuthPassword] = useState("");
+  const [authMode, setAuthMode] = useState<"sign_in" | "sign_up">("sign_in");
   const [authStatus, setAuthStatus] = useState("");
   const [authError, setAuthError] = useState("");
   const [isAuthLoading, setIsAuthLoading] = useState(false);
@@ -153,12 +154,11 @@ export default function App() {
           if (insertError) throw insertError;
           row = insertedData as UserRoleRow;
         }
-        console.log("user_roles row:", row);    
+
         setUserRole(row.role);
         setIsApproved(Boolean(row.approved));
-      } catch (error: any) {
+      } catch {
         if (!active) return;
-        console.error("Erro a carregar user_roles:", error);
         setUserRole(null);
         setIsApproved(false);
       } finally {
@@ -303,15 +303,29 @@ export default function App() {
     setAuthStatus("");
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: authEmail,
-        password: authPassword,
-      });
+      if (authMode === "sign_in") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: authPassword,
+        });
 
-      if (error) throw error;
+        if (error) throw error;
 
-      setAuthStatus("Login efetuado com sucesso.");
-      setPage("tree");
+        setAuthStatus("Login efetuado com sucesso.");
+        setPage("tree");
+      } else {
+        const { error } = await supabase.auth.signUp({
+          email: authEmail,
+          password: authPassword,
+        });
+
+        if (error) throw error;
+
+        setAuthStatus(
+          "Pedido de acesso enviado. Depois de entrares, a tua conta ficará a aguardar aprovação do administrador.",
+        );
+        setAuthMode("sign_in");
+      }
     } catch (error: any) {
       setAuthError(error?.message || "Não foi possível autenticar.");
     } finally {
@@ -710,13 +724,55 @@ export default function App() {
             Acesso privado
           </div>
 
-          <h2 style={{ marginTop: 0 }}>Entrar</h2>
+          <h2 style={{ marginTop: 0 }}>
+            {authMode === "sign_in" ? "Entrar" : "Pedir acesso"}
+          </h2>
 
           <p style={{ color: "#57534e" }}>
-            Esta árvore está privada. Tens de iniciar sessão para aceder.
+            {authMode === "sign_in"
+              ? "Esta árvore está privada. Tens de iniciar sessão para aceder."
+              : "Cria a tua conta para pedir acesso. Depois o administrador aprova e define se podes só ver ou também editar."}
           </p>
 
-          <div style={{ display: "grid", gap: 14, marginTop: 18 }}>
+          <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+            <button
+              onClick={() => {
+                setAuthMode("sign_in");
+                setAuthError("");
+                setAuthStatus("");
+              }}
+              style={{
+                border: "1px solid #d6d3d1",
+                background: authMode === "sign_in" ? "#292524" : "white",
+                color: authMode === "sign_in" ? "white" : "#292524",
+                borderRadius: 14,
+                padding: "10px 14px",
+                cursor: "pointer",
+              }}
+            >
+              Entrar
+            </button>
+
+            <button
+              onClick={() => {
+                setAuthMode("sign_up");
+                setAuthError("");
+                setAuthStatus("");
+              }}
+              style={{
+                border: "1px solid #d6d3d1",
+                background: authMode === "sign_up" ? "#292524" : "white",
+                color: authMode === "sign_up" ? "white" : "#292524",
+                borderRadius: 14,
+                padding: "10px 14px",
+                cursor: "pointer",
+              }}
+            >
+              Pedir acesso
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gap: 14 }}>
             <input
               value={authEmail}
               onChange={(e) => setAuthEmail(e.target.value)}
@@ -756,7 +812,13 @@ export default function App() {
                   opacity: isAuthLoading ? 0.7 : 1,
                 }}
               >
-                {isAuthLoading ? "A autenticar..." : "Entrar"}
+                {isAuthLoading
+                  ? authMode === "sign_in"
+                    ? "A autenticar..."
+                    : "A criar pedido..."
+                  : authMode === "sign_in"
+                    ? "Entrar"
+                    : "Pedir acesso"}
               </button>
             </div>
 
