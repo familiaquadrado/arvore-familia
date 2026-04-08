@@ -496,6 +496,42 @@ export default function App() {
     setSaveMessage("Foto removida da galeria. Clica em guardar alterações.");
   }
 
+  function moveGalleryPhoto(photoId: string, direction: "up" | "down") {
+    if (!selected) return;
+
+    const reorder = (gallery: typeof selected.gallery) => {
+      const currentIndex = gallery.findIndex((photo) => photo.id === photoId);
+      if (currentIndex === -1) return gallery;
+
+      const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+
+      if (targetIndex < 0 || targetIndex >= gallery.length) return gallery;
+
+      const nextGallery = [...gallery];
+      const [movedPhoto] = nextGallery.splice(currentIndex, 1);
+      nextGallery.splice(targetIndex, 0, movedPhoto);
+
+      return nextGallery;
+    };
+
+    if (draftPerson || isCreatingPerson) {
+      setDraftPerson({
+        ...selected,
+        gallery: reorder(selected.gallery || []),
+      });
+    } else {
+      setPeople((current) => ({
+        ...current,
+        [selected.id]: {
+          ...current[selected.id],
+          gallery: reorder(current[selected.id].gallery || []),
+        },
+      }));
+    }
+
+    setSaveMessage("Ordem das fotos atualizada. Clica em guardar alterações.");
+  }
+
   async function savePersonToSupabase(person: Person) {
     if (!session || !editingEnabled) {
       setSaveMessage("Tens de iniciar sessão com permissões de edição para guardar alterações.");
@@ -1158,6 +1194,8 @@ export default function App() {
           onProfilePhotoUploadClick={() => profilePhotoInputRef.current?.click()}
           onGalleryPhotoUploadClick={() => galleryPhotoInputRef.current?.click()}
           onRemoveGalleryPhoto={removeGalleryPhoto}
+          onMoveGalleryPhotoUp={(photoId: string) => moveGalleryPhoto(photoId, "up")}
+          onMoveGalleryPhotoDown={(photoId: string) => moveGalleryPhoto(photoId, "down")}
           onOpenPerson={openPersonDetail}
         />
       )}

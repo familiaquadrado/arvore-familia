@@ -15,6 +15,8 @@ type PersonDetailViewProps = {
   onProfilePhotoUploadClick: () => void;
   onGalleryPhotoUploadClick: () => void;
   onRemoveGalleryPhoto: (photoId: string) => void;
+  onMoveGalleryPhotoUp: (photoId: string) => void;
+  onMoveGalleryPhotoDown: (photoId: string) => void;
   onOpenPerson?: (personId: string) => void;
 };
 
@@ -125,6 +127,8 @@ export default function PersonDetailView({
   onProfilePhotoUploadClick,
   onGalleryPhotoUploadClick,
   onRemoveGalleryPhoto,
+  onMoveGalleryPhotoUp,
+  onMoveGalleryPhotoDown,
   onOpenPerson,
 }: PersonDetailViewProps) {
   const [lightboxState, setLightboxState] = useState<LightboxState>(null);
@@ -1965,7 +1969,7 @@ export default function PersonDetailView({
                   gap: 16,
                 }}
               >
-                {person.gallery.map((photo) => (
+                {person.gallery.map((photo, index) => (
                   <div
                     key={photo.id}
                     style={{
@@ -2039,7 +2043,46 @@ export default function PersonDetailView({
                       ) : null}
 
                       {editingEnabled ? (
-                        <div style={{ marginTop: 10 }}>
+                        <div
+                          style={{
+                            marginTop: 10,
+                            display: "grid",
+                            gridTemplateColumns: "repeat(3, 1fr)",
+                            gap: 8,
+                          }}
+                        >
+                          <button
+                            onClick={() => onMoveGalleryPhotoUp(photo.id)}
+                            disabled={index === 0}
+                            style={{
+                              border: "1px solid #d6d3d1",
+                              background: "white",
+                              borderRadius: 12,
+                              padding: "8px 10px",
+                              cursor: index === 0 ? "default" : "pointer",
+                              fontSize: 14,
+                              opacity: index === 0 ? 0.5 : 1,
+                            }}
+                          >
+                            ↑
+                          </button>
+
+                          <button
+                            onClick={() => onMoveGalleryPhotoDown(photo.id)}
+                            disabled={index === person.gallery.length - 1}
+                            style={{
+                              border: "1px solid #d6d3d1",
+                              background: "white",
+                              borderRadius: 12,
+                              padding: "8px 10px",
+                              cursor: index === person.gallery.length - 1 ? "default" : "pointer",
+                              fontSize: 14,
+                              opacity: index === person.gallery.length - 1 ? 0.5 : 1,
+                            }}
+                          >
+                            ↓
+                          </button>
+
                           <button
                             onClick={() => onRemoveGalleryPhoto(photo.id)}
                             style={{
