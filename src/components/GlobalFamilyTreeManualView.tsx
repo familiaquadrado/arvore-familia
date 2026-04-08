@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
-  MiniMap,
   Position,
   ReactFlowProvider,
   type Edge,
@@ -638,7 +637,6 @@ function GlobalFamilyTreeManualInner({
             zoomOnDoubleClick
             proOptions={{ hideAttribution: true }}
           >
-            <MiniMap />
             <Controls />
             <Background />
           </ReactFlow>
