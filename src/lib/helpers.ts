@@ -17,6 +17,16 @@ export function normalizePerson(row: SupabasePersonRow): Person {
           url: item.url,
           note: item.note || "",
           taggedPersonIds: Array.isArray(item.taggedPersonIds) ? item.taggedPersonIds : [],
+          faceTags: Array.isArray(item.faceTags)
+            ? item.faceTags.map((tag) => ({
+                id: tag.id,
+                personId: tag.personId || "",
+                x: typeof tag.x === "number" ? tag.x : 0,
+                y: typeof tag.y === "number" ? tag.y : 0,
+                width: typeof tag.width === "number" ? tag.width : 0.2,
+                height: typeof tag.height === "number" ? tag.height : 0.2,
+              }))
+            : [],
         }))
       : [],
     timeline: Array.isArray(row.timeline)

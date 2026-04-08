@@ -1,8 +1,18 @@
+export type PhotoFaceTag = {
+  id: string;
+  personId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 export type GalleryPhoto = {
   id: string;
   url: string;
   note: string;
   taggedPersonIds: string[];
+  faceTags: PhotoFaceTag[];
 };
 
 export type TimelineEvent = {

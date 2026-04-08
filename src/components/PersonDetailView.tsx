@@ -1,5 +1,5 @@
-import type { PeopleMap, Person, TimelineEvent } from "../types";
-import { useMemo, useState } from "react";
+import type { PeopleMap, Person, PhotoFaceTag, TimelineEvent } from "../types";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type PersonDetailViewProps = {
   person: Person;
@@ -25,6 +25,7 @@ type TaggedPhotoReference = {
   url: string;
   note: string;
   taggedPersonIds: string[];
+  faceTags: PhotoFaceTag[];
 };
 
 type LightboxState =
@@ -38,6 +39,13 @@ type LightboxState =
       photoId: string;
     }
   | null;
+
+type DraftFaceRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+} | null;
 
 function PersonLinkChip({
   label,
@@ -99,6 +107,10 @@ function PersonLinkText({
   );
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
 export default function PersonDetailView({
   person,
   people,
@@ -116,6 +128,17 @@ export default function PersonDetailView({
   onOpenPerson,
 }: PersonDetailViewProps) {
   const [lightboxState, setLightboxState] = useState<LightboxState>(null);
+  const [zoom, setZoom] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+  const [faceMarkingMode, setFaceMarkingMode] = useState(false);
+  const [isDrawingFace, setIsDrawingFace] = useState(false);
+  const [faceStartPoint, setFaceStartPoint] = useState<{ x: number; y: number } | null>(null);
+  const [draftFaceRect, setDraftFaceRect] = useState<DraftFaceRect>(null);
+
+  const imageAreaRef = useRef<HTMLDivElement | null>(null);
 
   const sortedPeople = useMemo(
     () => Object.values(people).sort((a, b) => a.fullName.localeCompare(b.fullName, "pt")),
@@ -135,6 +158,7 @@ export default function PersonDetailView({
             url: photo.url,
             note: photo.note || "",
             taggedPersonIds: photo.taggedPersonIds || [],
+            faceTags: Array.isArray(photo.faceTags) ? photo.faceTags : [],
           });
         }
       });
@@ -158,6 +182,132 @@ export default function PersonDetailView({
       ) || null
     );
   }, [lightboxState, taggedPhotosForPerson]);
+
+  useEffect(() => {
+    if (!lightboxState) {
+      setZoom(1);
+      setPosition({ x: 0, y: 0 });
+      setIsDragging(false);
+      setFaceMarkingMode(false);
+      setIsDrawingFace(false);
+      setFaceStartPoint(null);
+      setDraftFaceRect(null);
+    }
+  }, [lightboxState]);
+
+  function resetZoom() {
+    setZoom(1);
+    setPosition({ x: 0, y: 0 });
+    setIsDragging(false);
+  }
+
+  function resetFaceDraft() {
+    setIsDrawingFace(false);
+    setFaceStartPoint(null);
+    setDraftFaceRect(null);
+  }
+
+  function openOwnLightbox(photoId: string) {
+    resetZoom();
+    resetFaceDraft();
+    setFaceMarkingMode(false);
+    setLightboxState({ kind: "own", photoId });
+  }
+
+  function openTaggedLightbox(sourcePersonId: string, photoId: string) {
+    resetZoom();
+    resetFaceDraft();
+    setFaceMarkingMode(false);
+    setLightboxState({ kind: "tagged", sourcePersonId, photoId });
+  }
+
+  function handleZoomWheel(e: React.WheelEvent<HTMLDivElement>) {
+    if (faceMarkingMode) return;
+
+    e.preventDefault();
+
+    const delta = -e.deltaY;
+    setZoom((currentZoom) => {
+      const nextZoom = currentZoom + delta * 0.001;
+      return Math.min(Math.max(nextZoom, 0.5), 4);
+    });
+  }
+
+  function handleDragStart(e: React.MouseEvent<HTMLDivElement>) {
+    if (faceMarkingMode) return;
+
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    });
+  }
+
+  function handleDragMove(e: React.MouseEvent<HTMLDivElement>) {
+    if (faceMarkingMode || !isDragging) return;
+
+    setPosition({
+      x: e.clientX - dragStart.x,
+      y: e.clientY - dragStart.y,
+    });
+  }
+
+  function handleDragEnd() {
+    setIsDragging(false);
+  }
+
+  function getRelativePoint(event: React.MouseEvent<HTMLDivElement>) {
+    if (!imageAreaRef.current) return null;
+
+    const rect = imageAreaRef.current.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+
+    const x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+    const y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+
+    return { x, y };
+  }
+
+  function handleFaceDrawStart(event: React.MouseEvent<HTMLDivElement>) {
+    if (!editingEnabled || !faceMarkingMode) return;
+
+    const point = getRelativePoint(event);
+    if (!point) return;
+
+    setIsDrawingFace(true);
+    setFaceStartPoint(point);
+    setDraftFaceRect({
+      x: point.x,
+      y: point.y,
+      width: 0,
+      height: 0,
+    });
+  }
+
+  function handleFaceDrawMove(event: React.MouseEvent<HTMLDivElement>) {
+    if (!editingEnabled || !faceMarkingMode || !isDrawingFace || !faceStartPoint) return;
+
+    const point = getRelativePoint(event);
+    if (!point) return;
+
+    const x = Math.min(faceStartPoint.x, point.x);
+    const y = Math.min(faceStartPoint.y, point.y);
+    const width = Math.abs(point.x - faceStartPoint.x);
+    const height = Math.abs(point.y - faceStartPoint.y);
+
+    setDraftFaceRect({
+      x,
+      y,
+      width,
+      height,
+    });
+  }
+
+  function handleFaceDrawEnd() {
+    if (!editingEnabled || !faceMarkingMode) return;
+    setIsDrawingFace(false);
+    setFaceStartPoint(null);
+  }
 
   function updateGalleryPhoto(
     photoId: string,
@@ -188,6 +338,43 @@ export default function PersonDetailView({
         taggedPersonIds: nextIds,
       };
     });
+  }
+
+  function addFaceTag(photoId: string, personId: string) {
+    if (!draftFaceRect) return;
+    if (draftFaceRect.width < 0.03 || draftFaceRect.height < 0.03) return;
+
+    updateGalleryPhoto(photoId, (photo) => {
+      const currentFaceTags = Array.isArray(photo.faceTags) ? photo.faceTags : [];
+      const currentTaggedIds = Array.isArray(photo.taggedPersonIds) ? photo.taggedPersonIds : [];
+
+      return {
+        ...photo,
+        taggedPersonIds: currentTaggedIds.includes(personId)
+          ? currentTaggedIds
+          : [...currentTaggedIds, personId],
+        faceTags: [
+          ...currentFaceTags,
+          {
+            id: `face_${Date.now()}`,
+            personId,
+            x: draftFaceRect.x,
+            y: draftFaceRect.y,
+            width: draftFaceRect.width,
+            height: draftFaceRect.height,
+          },
+        ],
+      };
+    });
+
+    resetFaceDraft();
+  }
+
+  function removeFaceTag(photoId: string, faceTagId: string) {
+    updateGalleryPhoto(photoId, (photo) => ({
+      ...photo,
+      faceTags: (photo.faceTags || []).filter((tag) => tag.id !== faceTagId),
+    }));
   }
 
   function addParent(parentId: string) {
@@ -329,7 +516,7 @@ export default function PersonDetailView({
             style={{
               maxWidth: "90%",
               maxHeight: "90%",
-              width: "min(1000px, 100%)",
+              width: "min(1100px, 100%)",
               background: "#ffffff",
               borderRadius: 20,
               overflow: "hidden",
@@ -338,7 +525,7 @@ export default function PersonDetailView({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) 320px",
+                gridTemplateColumns: "minmax(0, 1fr) 340px",
                 gap: 0,
               }}
             >
@@ -351,15 +538,106 @@ export default function PersonDetailView({
                   minHeight: 400,
                 }}
               >
-                <img
-                  src={ownLightboxPhoto.url}
-                  alt={ownLightboxPhoto.note || "Foto da galeria"}
+                <div
+                  ref={imageAreaRef}
+                  onWheel={handleZoomWheel}
+                  onMouseDown={faceMarkingMode ? handleFaceDrawStart : handleDragStart}
+                  onMouseMove={faceMarkingMode ? handleFaceDrawMove : handleDragMove}
+                  onMouseUp={faceMarkingMode ? handleFaceDrawEnd : handleDragEnd}
+                  onMouseLeave={faceMarkingMode ? handleFaceDrawEnd : handleDragEnd}
                   style={{
-                    maxWidth: "100%",
-                    maxHeight: "80vh",
-                    display: "block",
+                    width: "100%",
+                    height: "80vh",
+                    overflow: "hidden",
+                    cursor: faceMarkingMode
+                      ? "crosshair"
+                      : isDragging
+                        ? "grabbing"
+                        : "grab",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    position: "relative",
                   }}
-                />
+                >
+                  <img
+                    src={ownLightboxPhoto.url}
+                    alt={ownLightboxPhoto.note || "Foto da galeria"}
+                    style={{
+                      transform: faceMarkingMode
+                        ? "none"
+                        : `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
+                      transformOrigin: "center",
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      width: faceMarkingMode ? "100%" : "auto",
+                      height: faceMarkingMode ? "100%" : "auto",
+                      objectFit: "contain",
+                      userSelect: "none",
+                      pointerEvents: "none",
+                      display: "block",
+                    }}
+                  />
+
+                  {(ownLightboxPhoto.faceTags || []).map((faceTag) => (
+                    <div
+                      key={faceTag.id}
+                      style={{
+                        position: "absolute",
+                        left: `${faceTag.x * 100}%`,
+                        top: `${faceTag.y * 100}%`,
+                        width: `${faceTag.width * 100}%`,
+                        height: `${faceTag.height * 100}%`,
+                        border: "2px solid #fbbf24",
+                        borderRadius: 8,
+                        boxSizing: "border-box",
+                        pointerEvents: "auto",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenPerson?.(faceTag.personId);
+                          setLightboxState(null);
+                        }}
+                        style={{
+                          position: "absolute",
+                          left: 0,
+                          top: "100%",
+                          transform: "translateY(6px)",
+                          border: "none",
+                          background: "#fbbf24",
+                          color: "#1c1917",
+                          borderRadius: 999,
+                          padding: "4px 8px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {people[faceTag.personId]?.fullName || faceTag.personId}
+                      </button>
+                    </div>
+                  ))}
+
+                  {draftFaceRect ? (
+                    <div
+                      style={{
+                        position: "absolute",
+                        left: `${draftFaceRect.x * 100}%`,
+                        top: `${draftFaceRect.y * 100}%`,
+                        width: `${draftFaceRect.width * 100}%`,
+                        height: `${draftFaceRect.height * 100}%`,
+                        border: "2px dashed #60a5fa",
+                        borderRadius: 8,
+                        boxSizing: "border-box",
+                        pointerEvents: "none",
+                      }}
+                    />
+                  ) : null}
+                </div>
               </div>
 
               <div
@@ -380,6 +658,49 @@ export default function PersonDetailView({
                 >
                   Foto
                 </div>
+
+                <div style={{ marginBottom: 12, color: "#57534e", fontSize: 14 }}>
+                  Zoom: {Math.round(zoom * 100)}%
+                </div>
+
+                {!faceMarkingMode ? (
+                  <button
+                    onClick={resetZoom}
+                    style={{
+                      marginBottom: 12,
+                      border: "1px solid #d6d3d1",
+                      background: "white",
+                      borderRadius: 12,
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      width: "100%",
+                    }}
+                  >
+                    Reset zoom
+                  </button>
+                ) : null}
+
+                {editingEnabled ? (
+                  <button
+                    onClick={() => {
+                      setFaceMarkingMode((current) => !current);
+                      resetFaceDraft();
+                      resetZoom();
+                    }}
+                    style={{
+                      marginBottom: 18,
+                      border: "1px solid #d6d3d1",
+                      background: faceMarkingMode ? "#292524" : "white",
+                      color: faceMarkingMode ? "white" : "#292524",
+                      borderRadius: 12,
+                      padding: "10px 12px",
+                      cursor: "pointer",
+                      width: "100%",
+                    }}
+                  >
+                    {faceMarkingMode ? "Sair do modo marcar rostos" : "Marcar rostos"}
+                  </button>
+                ) : null}
 
                 <div style={{ marginBottom: 18 }}>
                   <div style={{ marginBottom: 8, color: "#57534e", fontSize: 14 }}>
@@ -477,6 +798,70 @@ export default function PersonDetailView({
                     </select>
                   ) : null}
 
+                  {editingEnabled && faceMarkingMode && draftFaceRect ? (
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        if (!e.target.value) return;
+                        addFaceTag(ownLightboxPhoto.id, e.target.value);
+                      }}
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        borderRadius: 12,
+                        border: "1px solid #d6d3d1",
+                        background: "white",
+                        marginBottom: 12,
+                      }}
+                    >
+                      <option value="">Associar a caixa desenhada a uma pessoa...</option>
+                      {sortedPeople.map((candidate) => (
+                        <option key={candidate.id} value={candidate.id}>
+                          {candidate.fullName}
+                        </option>
+                      ))}
+                    </select>
+                  ) : null}
+
+                  {editingEnabled && draftFaceRect ? (
+                    <button
+                      onClick={resetFaceDraft}
+                      style={{
+                        marginBottom: 12,
+                        border: "1px solid #d6d3d1",
+                        background: "white",
+                        borderRadius: 12,
+                        padding: "10px 12px",
+                        cursor: "pointer",
+                        width: "100%",
+                      }}
+                    >
+                      Cancelar caixa em desenho
+                    </button>
+                  ) : null}
+
+                  {editingEnabled && (ownLightboxPhoto.faceTags || []).length ? (
+                    <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+                      {(ownLightboxPhoto.faceTags || []).map((faceTag) => (
+                        <button
+                          key={faceTag.id}
+                          onClick={() => removeFaceTag(ownLightboxPhoto.id, faceTag.id)}
+                          style={{
+                            border: "1px solid #d6d3d1",
+                            background: "white",
+                            borderRadius: 12,
+                            padding: "8px 10px",
+                            cursor: "pointer",
+                            fontSize: 14,
+                            textAlign: "left",
+                          }}
+                        >
+                          Remover rosto: {people[faceTag.personId]?.fullName || faceTag.personId}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+
                   {editingEnabled && (ownLightboxPhoto.taggedPersonIds || []).length ? (
                     <div
                       style={{
@@ -498,7 +883,7 @@ export default function PersonDetailView({
                             textAlign: "left",
                           }}
                         >
-                          Remover: {people[taggedId]?.fullName || taggedId}
+                          Remover identificação: {people[taggedId]?.fullName || taggedId}
                         </button>
                       ))}
                     </div>
@@ -545,7 +930,7 @@ export default function PersonDetailView({
             style={{
               maxWidth: "90%",
               maxHeight: "90%",
-              width: "min(1000px, 100%)",
+              width: "min(1100px, 100%)",
               background: "#ffffff",
               borderRadius: 20,
               overflow: "hidden",
@@ -554,7 +939,7 @@ export default function PersonDetailView({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "minmax(0, 1fr) 320px",
+                gridTemplateColumns: "minmax(0, 1fr) 340px",
                 gap: 0,
               }}
             >
@@ -567,15 +952,80 @@ export default function PersonDetailView({
                   minHeight: 400,
                 }}
               >
-                <img
-                  src={taggedLightboxPhoto.url}
-                  alt={taggedLightboxPhoto.note || "Foto identificada"}
+                <div
+                  onWheel={handleZoomWheel}
+                  onMouseDown={handleDragStart}
+                  onMouseMove={handleDragMove}
+                  onMouseUp={handleDragEnd}
+                  onMouseLeave={handleDragEnd}
                   style={{
-                    maxWidth: "100%",
-                    maxHeight: "80vh",
-                    display: "block",
+                    width: "100%",
+                    height: "80vh",
+                    overflow: "hidden",
+                    cursor: isDragging ? "grabbing" : "grab",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    position: "relative",
                   }}
-                />
+                >
+                  <img
+                    src={taggedLightboxPhoto.url}
+                    alt={taggedLightboxPhoto.note || "Foto identificada"}
+                    style={{
+                      transform: `translate(${position.x}px, ${position.y}px) scale(${zoom})`,
+                      transformOrigin: "center",
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      userSelect: "none",
+                      pointerEvents: "none",
+                      display: "block",
+                    }}
+                  />
+
+                  {(taggedLightboxPhoto.faceTags || []).map((faceTag) => (
+                    <div
+                      key={faceTag.id}
+                      style={{
+                        position: "absolute",
+                        left: `${faceTag.x * 100}%`,
+                        top: `${faceTag.y * 100}%`,
+                        width: `${faceTag.width * 100}%`,
+                        height: `${faceTag.height * 100}%`,
+                        border: "2px solid #fbbf24",
+                        borderRadius: 8,
+                        boxSizing: "border-box",
+                        pointerEvents: "auto",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenPerson?.(faceTag.personId);
+                          setLightboxState(null);
+                        }}
+                        style={{
+                          position: "absolute",
+                          left: 0,
+                          top: "100%",
+                          transform: "translateY(6px)",
+                          border: "none",
+                          background: "#fbbf24",
+                          color: "#1c1917",
+                          borderRadius: 999,
+                          padding: "4px 8px",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {people[faceTag.personId]?.fullName || faceTag.personId}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div
@@ -596,6 +1046,25 @@ export default function PersonDetailView({
                 >
                   Foto identificada
                 </div>
+
+                <div style={{ marginBottom: 12, color: "#57534e", fontSize: 14 }}>
+                  Zoom: {Math.round(zoom * 100)}%
+                </div>
+
+                <button
+                  onClick={resetZoom}
+                  style={{
+                    marginBottom: 18,
+                    border: "1px solid #d6d3d1",
+                    background: "white",
+                    borderRadius: 12,
+                    padding: "10px 12px",
+                    cursor: "pointer",
+                    width: "100%",
+                  }}
+                >
+                  Reset zoom
+                </button>
 
                 <div
                   style={{
@@ -1473,7 +1942,7 @@ export default function PersonDetailView({
                     <img
                       src={photo.url}
                       alt={photo.note || "Foto da galeria"}
-                      onClick={() => setLightboxState({ kind: "own", photoId: photo.id })}
+                      onClick={() => openOwnLightbox(photo.id)}
                       style={{
                         width: "100%",
                         height: 180,
@@ -1593,13 +2062,7 @@ export default function PersonDetailView({
                     <img
                       src={photo.url}
                       alt={photo.note || "Foto identificada"}
-                      onClick={() =>
-                        setLightboxState({
-                          kind: "tagged",
-                          sourcePersonId: photo.sourcePersonId,
-                          photoId: photo.photoId,
-                        })
-                      }
+                      onClick={() => openTaggedLightbox(photo.sourcePersonId, photo.photoId)}
                       style={{
                         width: "100%",
                         height: 180,

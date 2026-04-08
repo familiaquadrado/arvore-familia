@@ -447,6 +447,7 @@ export default function App() {
         url: publicUrl,
         note: galleryNoteDraft.trim(),
         taggedPersonIds: [],
+        faceTags: [],
       };
 
       if (draftPerson || isCreatingPerson) {
