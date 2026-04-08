@@ -137,6 +137,7 @@ export default function PersonDetailView({
   const [isDrawingFace, setIsDrawingFace] = useState(false);
   const [faceStartPoint, setFaceStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [draftFaceRect, setDraftFaceRect] = useState<DraftFaceRect>(null);
+  const [showFaceTags, setShowFaceTags] = useState(true);
 
   const imageAreaRef = useRef<HTMLDivElement | null>(null);
 
@@ -192,6 +193,7 @@ export default function PersonDetailView({
       setIsDrawingFace(false);
       setFaceStartPoint(null);
       setDraftFaceRect(null);
+      setShowFaceTags(true);
     }
   }, [lightboxState]);
 
@@ -211,6 +213,7 @@ export default function PersonDetailView({
     resetZoom();
     resetFaceDraft();
     setFaceMarkingMode(false);
+    setShowFaceTags(true);
     setLightboxState({ kind: "own", photoId });
   }
 
@@ -218,6 +221,7 @@ export default function PersonDetailView({
     resetZoom();
     resetFaceDraft();
     setFaceMarkingMode(false);
+    setShowFaceTags(true);
     setLightboxState({ kind: "tagged", sourcePersonId, photoId });
   }
 
@@ -579,48 +583,49 @@ export default function PersonDetailView({
                     }}
                   />
 
-                  {(ownLightboxPhoto.faceTags || []).map((faceTag) => (
-                    <div
-                      key={faceTag.id}
-                      style={{
-                        position: "absolute",
-                        left: `${faceTag.x * 100}%`,
-                        top: `${faceTag.y * 100}%`,
-                        width: `${faceTag.width * 100}%`,
-                        height: `${faceTag.height * 100}%`,
-                        border: "2px solid #fbbf24",
-                        borderRadius: 8,
-                        boxSizing: "border-box",
-                        pointerEvents: "auto",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenPerson?.(faceTag.personId);
-                          setLightboxState(null);
-                        }}
+                  {showFaceTags &&
+                    (ownLightboxPhoto.faceTags || []).map((faceTag) => (
+                      <div
+                        key={faceTag.id}
                         style={{
                           position: "absolute",
-                          left: 0,
-                          top: "100%",
-                          transform: "translateY(6px)",
-                          border: "none",
-                          background: "#fbbf24",
-                          color: "#1c1917",
-                          borderRadius: 999,
-                          padding: "4px 8px",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
+                          left: `${faceTag.x * 100}%`,
+                          top: `${faceTag.y * 100}%`,
+                          width: `${faceTag.width * 100}%`,
+                          height: `${faceTag.height * 100}%`,
+                          border: "2px solid #fbbf24",
+                          borderRadius: 8,
+                          boxSizing: "border-box",
+                          pointerEvents: "auto",
                         }}
                       >
-                        {people[faceTag.personId]?.fullName || faceTag.personId}
-                      </button>
-                    </div>
-                  ))}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenPerson?.(faceTag.personId);
+                            setLightboxState(null);
+                          }}
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            top: "100%",
+                            transform: "translateY(6px)",
+                            border: "none",
+                            background: "#fbbf24",
+                            color: "#1c1917",
+                            borderRadius: 999,
+                            padding: "4px 8px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {people[faceTag.personId]?.fullName || faceTag.personId}
+                        </button>
+                      </div>
+                    ))}
 
                   {draftFaceRect ? (
                     <div
@@ -662,6 +667,21 @@ export default function PersonDetailView({
                 <div style={{ marginBottom: 12, color: "#57534e", fontSize: 14 }}>
                   Zoom: {Math.round(zoom * 100)}%
                 </div>
+
+                <button
+                  onClick={() => setShowFaceTags((current) => !current)}
+                  style={{
+                    marginBottom: 12,
+                    border: "1px solid #d6d3d1",
+                    background: "white",
+                    borderRadius: 12,
+                    padding: "10px 12px",
+                    cursor: "pointer",
+                    width: "100%",
+                  }}
+                >
+                  {showFaceTags ? "Esconder identificações" : "Mostrar identificações"}
+                </button>
 
                 {!faceMarkingMode ? (
                   <button
@@ -983,48 +1003,49 @@ export default function PersonDetailView({
                     }}
                   />
 
-                  {(taggedLightboxPhoto.faceTags || []).map((faceTag) => (
-                    <div
-                      key={faceTag.id}
-                      style={{
-                        position: "absolute",
-                        left: `${faceTag.x * 100}%`,
-                        top: `${faceTag.y * 100}%`,
-                        width: `${faceTag.width * 100}%`,
-                        height: `${faceTag.height * 100}%`,
-                        border: "2px solid #fbbf24",
-                        borderRadius: 8,
-                        boxSizing: "border-box",
-                        pointerEvents: "auto",
-                      }}
-                    >
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenPerson?.(faceTag.personId);
-                          setLightboxState(null);
-                        }}
+                  {showFaceTags &&
+                    (taggedLightboxPhoto.faceTags || []).map((faceTag) => (
+                      <div
+                        key={faceTag.id}
                         style={{
                           position: "absolute",
-                          left: 0,
-                          top: "100%",
-                          transform: "translateY(6px)",
-                          border: "none",
-                          background: "#fbbf24",
-                          color: "#1c1917",
-                          borderRadius: 999,
-                          padding: "4px 8px",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
+                          left: `${faceTag.x * 100}%`,
+                          top: `${faceTag.y * 100}%`,
+                          width: `${faceTag.width * 100}%`,
+                          height: `${faceTag.height * 100}%`,
+                          border: "2px solid #fbbf24",
+                          borderRadius: 8,
+                          boxSizing: "border-box",
+                          pointerEvents: "auto",
                         }}
                       >
-                        {people[faceTag.personId]?.fullName || faceTag.personId}
-                      </button>
-                    </div>
-                  ))}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenPerson?.(faceTag.personId);
+                            setLightboxState(null);
+                          }}
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            top: "100%",
+                            transform: "translateY(6px)",
+                            border: "none",
+                            background: "#fbbf24",
+                            color: "#1c1917",
+                            borderRadius: 999,
+                            padding: "4px 8px",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {people[faceTag.personId]?.fullName || faceTag.personId}
+                        </button>
+                      </div>
+                    ))}
                 </div>
               </div>
 
@@ -1050,6 +1071,21 @@ export default function PersonDetailView({
                 <div style={{ marginBottom: 12, color: "#57534e", fontSize: 14 }}>
                   Zoom: {Math.round(zoom * 100)}%
                 </div>
+
+                <button
+                  onClick={() => setShowFaceTags((current) => !current)}
+                  style={{
+                    marginBottom: 12,
+                    border: "1px solid #d6d3d1",
+                    background: "white",
+                    borderRadius: 12,
+                    padding: "10px 12px",
+                    cursor: "pointer",
+                    width: "100%",
+                  }}
+                >
+                  {showFaceTags ? "Esconder identificações" : "Mostrar identificações"}
+                </button>
 
                 <button
                   onClick={resetZoom}
