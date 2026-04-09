@@ -212,7 +212,7 @@ export default function TreeView({
               <ParentsBlock
                 parentIds={leftParentIds}
                 people={people}
-                sideLabel="da pessoa à esquerda"
+                sideLabel=" "
                 selectedId={selectedId}
                 onSelect={onSelect}
               />
@@ -242,7 +242,7 @@ export default function TreeView({
               <ParentsBlock
                 parentIds={rightParentIds}
                 people={people}
-                sideLabel="da pessoa à direita"
+                sideLabel=" "
                 selectedId={selectedId}
                 onSelect={onSelect}
               />
