@@ -1021,7 +1021,7 @@ export default function App() {
                 cursor: "pointer",
               }}
             >
-              Ver árvore global manual
+              Ver Árvore
             </button>
           ) : null}
 
@@ -1035,7 +1035,7 @@ export default function App() {
               cursor: "pointer",
             }}
           >
-            Calendário de aniversários
+            Aniversários
           </button>
 
           {isAdmin ? (
@@ -1073,7 +1073,7 @@ export default function App() {
                 cursor: "pointer",
               }}
             >
-              ← Voltar à árvore
+              ← Voltar
             </button>
           ) : null}
 

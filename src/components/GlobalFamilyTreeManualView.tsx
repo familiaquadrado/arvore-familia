@@ -484,10 +484,10 @@ function GlobalFamilyTreeManualInner({
               marginBottom: 8,
             }}
           >
-            Árvore global manual
+            
           </div>
 
-          <h2 style={{ margin: 0 }}>Posicionamento livre</h2>
+          <h2 style={{ margin: 0 }}>Árvore Global</h2>
         </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -545,7 +545,7 @@ function GlobalFamilyTreeManualInner({
                 fontSize: 14,
               }}
             >
-              Vista bloqueada
+              
             </div>
           )}
 
