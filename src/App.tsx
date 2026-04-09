@@ -880,9 +880,9 @@ export default function App() {
           Arquivo da Família
         </div>
 
-        <h1 style={{ marginTop: 8, marginBottom: 8 }}>Árvore Genealógica Interativa</h1>
+        <h1 style={{ marginTop: 8, marginBottom: 8 }}>Árvore Genealógica Familia Quadrado Rodrigues</h1>
 
-        <p style={{ color: "#57534e", margin: 0 }}>Projeto modular em React.</p>
+        <p style={{ color: "#57534e", margin: 0 }}>Projeto de César José Quadrado Rodrigues.</p>
 
         {loadError ? <p style={{ color: "#b45309", marginTop: 12 }}>{loadError}</p> : null}
 
