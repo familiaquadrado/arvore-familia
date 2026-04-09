@@ -1230,7 +1230,7 @@ export default function PersonDetailView({
           marginBottom: 20,
         }}
       >
-        ← Voltar à árvore
+        ← Voltar
       </button>
 
       <div
@@ -1336,7 +1336,7 @@ export default function PersonDetailView({
           >
             <div>
               <div style={{ marginBottom: 6, color: "#78716c", fontSize: 14 }}>
-                Profissão
+              
               </div>
               {editingEnabled ? (
                 <input
@@ -1347,7 +1347,7 @@ export default function PersonDetailView({
                       profession: e.target.value,
                     })
                   }
-                  placeholder="Profissão"
+                  placeholder=" "
                   style={{
                     width: "100%",
                     padding: "10px 12px",
